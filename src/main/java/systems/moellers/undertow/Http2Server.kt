@@ -37,6 +37,9 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.security.KeyStore
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.net.ssl.*
 
 /**
@@ -67,6 +70,7 @@ object Http2Server {
         handler = addUndertowTransport(handler)
         handler = learnPush(handler)
         handler = attachSession(handler)
+        handler = log(handler)
 
         val server = Undertow.builder()
                 .setServerOption(UndertowOptions.ENABLE_HTTP2, true)
@@ -76,6 +80,7 @@ object Http2Server {
                 .build()
 
         server.start()
+        println("Server ist listening at https://localhost:8443")
     }
 
     private fun handleException(next: HttpHandler): HttpHandler {
@@ -111,6 +116,20 @@ object Http2Server {
             exchange.statusCode = StatusCodes.TEMPORARY_REDIRECT
         }
         return predicate(secure(), handler, redirect)
+    }
+
+    private fun log(next: HttpHandler): HttpHandler {
+        val dateFormat = SimpleDateFormat("[yyyy-MM-dd HH:mm:ss]")
+        return HttpHandler { exchange ->
+            next.handleRequest(exchange)
+            val statusColor = when (exchange.statusCode) {
+                in 100..299 -> "1;32"
+                in 300..399 -> "1;33"
+                else -> "1;31"
+            }
+            val method = exchange.requestMethod.toString().padEnd(7)
+            println("${dateFormat.format(Date())} \u001b[1;38;2;255;127;0m$method\u001b[0m \u001b[${statusColor}m${exchange.statusCode}\u001b[0m ${exchange.requestPath}")
+        }
     }
 
     @Throws(Exception::class)
