@@ -25,7 +25,7 @@ cp src/main/resources/server.crt /etc/ca-certificates/trust-source/anchors/under
 trust expose-compat
 ```
 
-Proceed to https://localhost/pet/corny in your favourite Browser!
+Proceed to [/pet/corny](https://localhost/pet/corny) in your favourite Browser!
 
 ## Stop it
 
