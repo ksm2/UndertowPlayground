@@ -19,23 +19,20 @@
 package systems.moellers.undertow
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import io.undertow.Handlers.*
 import io.undertow.Undertow
 import io.undertow.UndertowOptions
 import io.undertow.attribute.ExchangeAttributes
 import io.undertow.predicate.Predicates.secure
 import io.undertow.server.HttpHandler
-import io.undertow.server.handlers.BlockingHandler
 import io.undertow.server.handlers.LearningPushHandler
 import io.undertow.server.session.InMemorySessionManager
 import io.undertow.server.session.SessionAttachmentHandler
 import io.undertow.server.session.SessionCookieConfig
 import io.undertow.util.Headers
-import io.undertow.util.PathTemplateMatch
 import io.undertow.util.StatusCodes
 import systems.moellers.undertow.error.*
-import systems.moellers.undertow.model.Pet
+import systems.moellers.undertow.handler.Router
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -63,69 +60,7 @@ object Http2Server {
         val bindAddress = System.getProperty("bind.address", "0.0.0.0")
         val sslContext = createSSLContext(loadKeyStore("server.keystore"), loadKeyStore("server.truststore"))
 
-        // Define Handlers
-        var handler: HttpHandler
-
-        val mapper = jacksonObjectMapper()
-
-        val pets = hashMapOf(
-            "corny" to Pet("corny", 24),
-            "markus" to Pet("markus", 25)
-        )
-
-        handler = routing()
-        .add("POST", "/pet", BlockingHandler { exchange ->
-            val pet: Pet = mapper.readValue(exchange.inputStream)
-            pets[pet.name] = pet
-
-            val json = mapper.writeValueAsString(pet)
-            exchange.responseSender.send(json)
-        })
-        .add("GET", "/pet/{name}", { exchange ->
-            val pathMatch = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY)
-            val name = pathMatch.parameters["name"]
-            name ?: throw BadRequest("No pet name provided")
-
-            val pet = pets[name]
-            pet ?: throw NotFound("Could not find pet")
-
-            exchange.responseSender.send(mapper.writeValueAsString(pet))
-        })
-        .add("PUT", "/pet/{name}", BlockingHandler { exchange ->
-            val pathMatch = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY)
-            val name = pathMatch.parameters["name"]
-            name ?: throw BadRequest("No pet name provided")
-
-            val pet: Pet = mapper.readValue(exchange.inputStream)
-
-            pets[name] = pet
-            exchange.responseSender.send(mapper.writeValueAsString(pet))
-        })
-        .add("DELETE", "/pet/{name}", { exchange ->
-            val pathMatch = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY)
-            val name = pathMatch.parameters["name"]
-            name ?: throw BadRequest("No pet name provided")
-
-            val pet = pets[name]
-            pet ?: throw NotFound("Could not find pet")
-
-            pets.remove(name)
-            exchange.responseSender.send(mapper.writeValueAsString(pet))
-        })
-
-        .add("POST", "/pet/{name}/increaseAge", { exchange ->
-            val pathMatch = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY)
-            val name = pathMatch.parameters["name"]
-            name ?: throw BadRequest("No pet name provided")
-
-            val pet = pets[name]
-            pet ?: throw NotFound("Could not find pet")
-
-            pet.age += 1
-            exchange.responseSender.send(mapper.writeValueAsString(pet))
-        })
-
-
+        var handler: HttpHandler = Router()
         handler = handleException(handler)
         handler = header(handler, Headers.CONTENT_TYPE_STRING, "application/json")
         handler = redirectIfNotSecure(handler)
@@ -141,20 +76,6 @@ object Http2Server {
                 .build()
 
         server.start()
-
-//        val clientSslContext = createSSLContext(loadKeyStore("client.keystore"), loadKeyStore("client.truststore"))
-//        val proxy = LoadBalancingProxyClient()
-//                .addHost(URI("https://localhost:8443"), null, UndertowXnioSsl(Xnio.getInstance(), OptionMap.EMPTY, clientSslContext), OptionMap.create(UndertowOptions.ENABLE_HTTP2, true))
-//                .setConnectionsPerThread(20)
-//
-//        val reverseProxy = Undertow.builder()
-//                .setServerOption(UndertowOptions.ENABLE_HTTP2, true)
-//                .addHttpListener(8081, bindAddress)
-//                .addHttpsListener(8444, bindAddress, sslContext)
-//                .setHandler(ProxyHandler(proxy, 30000, ResponseCodeHandler.HANDLE_404))
-//                .build()
-//        reverseProxy.start()
-
     }
 
     private fun handleException(next: HttpHandler): HttpHandler {
@@ -217,24 +138,19 @@ object Http2Server {
         return pw?.toCharArray() ?: STORE_PASSWORD
     }
 
-
     @Throws(Exception::class)
     private fun createSSLContext(keyStore: KeyStore, trustStore: KeyStore): SSLContext {
-        val keyManagers: Array<KeyManager>
         val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
         keyManagerFactory.init(keyStore, password("key"))
-        keyManagers = keyManagerFactory.keyManagers
+        val keyManagers = keyManagerFactory.keyManagers
 
-        val trustManagers: Array<TrustManager>
         val trustManagerFactory = TrustManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
         trustManagerFactory.init(trustStore)
-        trustManagers = trustManagerFactory.trustManagers
+        val trustManagers = trustManagerFactory.trustManagers
 
-        val sslContext: SSLContext
-        sslContext = SSLContext.getInstance("TLS")
+        val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(keyManagers, trustManagers, null)
 
         return sslContext
     }
-
 }
