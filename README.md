@@ -13,9 +13,19 @@ Then build a container with docker
 docker build -t undertow .
 ```
 
-Run the container
+Create a docker network “undertowtest”
 ```bash
-docker run -d -p 443:8443 --name undertow undertow
+docker network create undertowtest
+```
+
+Start a MongoDB in “undertowtest”
+```bash
+docker run -d --name mongo --network-alias mongo --net undertowtest mongo
+```
+
+Start the Undertow server in “undertowtest”
+```bash
+docker run -d -p 443:8443 --name undertow --network-alias undertow --net undertowtest  undertow
 ```
 
 Add the SSL certificate to your trusted certificates.
@@ -25,7 +35,7 @@ cp src/main/resources/server.crt /etc/ca-certificates/trust-source/anchors/under
 trust expose-compat
 ```
 
-Proceed to [/pet/corny](https://localhost/pet/corny) in your favourite Browser!
+Proceed to [/pet](https://localhost/pet) in your favourite Browser!
 
 ## Test RESTful API with cURL
 
