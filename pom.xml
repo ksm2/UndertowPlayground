@@ -12,6 +12,7 @@
         <undertow.version>1.4.8.Final</undertow.version>
         <kotlin.version>1.0.6</kotlin.version>
         <jackson.version>2.8.6</jackson.version>
+        <kmongo.version>3.3.5</kmongo.version>
     </properties>
 
     <dependencies>
@@ -73,6 +74,12 @@
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-kotlin</artifactId>
             <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.litote.kmongo</groupId>
+            <artifactId>kmongo</artifactId>
+            <version>${kmongo.version}</version>
         </dependency>
     </dependencies>
 
